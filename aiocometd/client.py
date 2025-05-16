@@ -530,24 +530,44 @@ class Client:  # pylint: disable=too-many-instance-attributes
             )
             tasks.append(server_disconnected_task)
 
-            # Wait for the first task to complete
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            # Create a future to track the first completed task
+            first_done = asyncio.Future()
 
-            # Find the first successful result
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    continue
-                task = tasks[i]
-                if task == get_task:
-                    return result
-                if task == server_disconnected_task:
-                    await self.close()
-                    raise ServerError(
-                        "Connection closed by the server",
-                        self._transport.last_connect_result,
-                    )
-                if task == timeout_task:
-                    raise TransportTimeoutError("Lost connection with the server.")
+            def set_first_done(task: asyncio.Task[Any]) -> None:
+                if not first_done.done():
+                    try:
+                        result = task.result()
+                        first_done.set_result((task, result))
+                    except Exception as e:
+                        first_done.set_exception(e)
+
+            # Add callbacks to all tasks
+            for task in tasks:
+                task.add_done_callback(set_first_done)
+
+            # Wait for the first task to complete
+            completed_task, result = await first_done
+
+            # Cancel all other tasks
+            for task in tasks:
+                if task != completed_task and not task.done():
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+
+            # Handle the completed task
+            if completed_task == get_task:
+                return result
+            if completed_task == server_disconnected_task:
+                await self.close()
+                raise ServerError(
+                    "Connection closed by the server",
+                    self._transport.last_connect_result,
+                )
+            if completed_task == timeout_task:
+                raise TransportTimeoutError("Lost connection with the server.")
 
             # This should never happen
             raise RuntimeError("No task completed successfully")
