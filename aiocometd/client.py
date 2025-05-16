@@ -518,49 +518,64 @@ class Client:  # pylint: disable=too-many-instance-attributes
         connection with the server in :obj:`connection_timeout` time.
         :raise ServerError: If the connection gets closed by the server.
         """
-        tasks: List[asyncio.Future[Any]] = []
-        # task waiting on connection timeout
-        if connection_timeout:
-            timeout_task = asyncio.create_task(
-                self._wait_connection_timeout(connection_timeout)
-            )
-            tasks.append(timeout_task)
-
-        assert self._incoming_queue is not None
-        # task waiting on incoming messages
-        get_task = asyncio.create_task(self._incoming_queue.get())
-        tasks.append(get_task)
-
-        assert self._transport is not None
-        # task waiting on server side disconnect
-        server_disconnected_task = asyncio.create_task(
-            self._transport.wait_for_state(TransportState.SERVER_DISCONNECTED)
-        )
-        tasks.append(server_disconnected_task)
-
+        tasks: List[asyncio.Task[Any]] = []
         try:
-            # Wait for the first task to complete
-            done = await asyncio.gather(*tasks, return_exceptions=True)
+            # task waiting on connection timeout
+            if connection_timeout:
+                timeout_task = asyncio.create_task(
+                    self._wait_connection_timeout(connection_timeout)
+                )
+                tasks.append(timeout_task)
 
-            # Find the first task that completed successfully
-            for i, result in enumerate(done):
-                if isinstance(result, Exception):
-                    continue
-                if i == 1:  # get_task
-                    return result
-                if i == 2:  # server_disconnected_task
+            assert self._incoming_queue is not None
+            # task waiting on incoming messages
+            get_task = asyncio.create_task(self._incoming_queue.get())
+            tasks.append(get_task)
+
+            assert self._transport is not None
+            # task waiting on server side disconnect
+            server_disconnected_task = asyncio.create_task(
+                self._transport.wait_for_state(TransportState.SERVER_DISCONNECTED)
+            )
+            tasks.append(server_disconnected_task)
+
+            # Wait for the first task to complete
+            done, pending = await asyncio.wait(
+                tasks, return_when=asyncio.FIRST_COMPLETED
+            )
+
+            # Cancel all pending tasks
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+            # Handle the completed task
+            for task in done:
+                if task == get_task:
+                    return task.result()
+                if task == server_disconnected_task:
                     await self.close()
                     raise ServerError(
                         "Connection closed by the server",
                         self._transport.last_connect_result,
                     )
+                if task == timeout_task:
+                    raise TransportTimeoutError("Lost connection with the server.")
 
-            # If we get here, it means the timeout task completed first
-            raise TransportTimeoutError("Lost connection with the server.")
+            # This should never happen
+            raise RuntimeError("No task completed unexpectedly")
+
         except asyncio.CancelledError:
-            # cancel all tasks
+            # Cancel all tasks
             for task in tasks:
                 task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
             raise
 
     async def _wait_connection_timeout(self, timeout: Union[int, float]) -> None:
@@ -572,14 +587,19 @@ class Client:  # pylint: disable=too-many-instance-attributes
         connection fails.
         """
         assert self._transport is not None
-        while True:
-            await self._transport.wait_for_state(TransportState.CONNECTING)
-            try:
-                await asyncio.wait_for(
-                    self._transport.wait_for_state(TransportState.CONNECTED), timeout
-                )
-            except asyncio.TimeoutError:
-                break
+        try:
+            while True:
+                await self._transport.wait_for_state(TransportState.CONNECTING)
+                try:
+                    await asyncio.wait_for(
+                        self._transport.wait_for_state(TransportState.CONNECTED),
+                        timeout,
+                    )
+                except asyncio.TimeoutError:
+                    break
+        except asyncio.CancelledError:
+            # Re-raise the cancellation to be handled by the caller
+            raise
 
     async def _check_server_disconnected(self) -> None:
         """Checks whether the current transport'state is
