@@ -539,24 +539,23 @@ class Client:  # pylint: disable=too-many-instance-attributes
         tasks.append(server_disconnected_task)
 
         try:
-            done, pending = await asyncio.wait(
-                tasks, return_when=asyncio.FIRST_COMPLETED
-            )
+            # Wait for the first task to complete
+            done = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # cancel all pending tasks
-            for task in pending:
-                task.cancel()
+            # Find the first task that completed successfully
+            for i, result in enumerate(done):
+                if isinstance(result, Exception):
+                    continue
+                if i == 1:  # get_task
+                    return result
+                if i == 2:  # server_disconnected_task
+                    await self.close()
+                    raise ServerError(
+                        "Connection closed by the server",
+                        self._transport.last_connect_result,
+                    )
 
-            # handle the completed task
-            if get_task in done:
-                return get_task.result()
-
-            if server_disconnected_task in done:
-                await self.close()
-                raise ServerError(
-                    "Connection closed by the server",
-                    self._transport.last_connect_result,
-                )
+            # If we get here, it means the timeout task completed first
             raise TransportTimeoutError("Lost connection with the server.")
         except asyncio.CancelledError:
             # cancel all tasks

@@ -1,4 +1,5 @@
 """Base transtport abstract class definition"""
+
 import asyncio
 import logging
 from abc import abstractmethod
@@ -8,14 +9,32 @@ from typing import Union, Optional, List, Set, Awaitable, Any
 
 import aiohttp
 
-from aiocometd.constants import ConnectionType, MetaChannel, TransportState, \
-    HANDSHAKE_MESSAGE, CONNECT_MESSAGE, DISCONNECT_MESSAGE, \
-    SUBSCRIBE_MESSAGE, UNSUBSCRIBE_MESSAGE, PUBLISH_MESSAGE
-from aiocometd.utils import defer, is_matching_response, \
-    is_auth_error_message, is_event_message
+from aiocometd.constants import (
+    ConnectionType,
+    MetaChannel,
+    TransportState,
+    HANDSHAKE_MESSAGE,
+    CONNECT_MESSAGE,
+    DISCONNECT_MESSAGE,
+    SUBSCRIBE_MESSAGE,
+    UNSUBSCRIBE_MESSAGE,
+    PUBLISH_MESSAGE,
+)
+from aiocometd.utils import (
+    defer,
+    is_matching_response,
+    is_auth_error_message,
+    is_event_message,
+)
 from aiocometd.exceptions import TransportInvalidOperation, TransportError
-from aiocometd.typing import SSLValidationMode, JsonObject, JsonLoader, \
-    JsonDumper, Headers, Payload
+from aiocometd.typing import (
+    SSLValidationMode,
+    JsonObject,
+    JsonLoader,
+    JsonDumper,
+    Headers,
+    Payload,
+)
 from aiocometd.extensions import Extension, AuthExtension
 from aiocometd.transports.abc import Transport
 
@@ -31,21 +50,26 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
     When subclassing, at a minimum the :meth:`_send_final_payload` and
     :obj:`~Transport.connection_type` methods should be reimplemented.
     """
+
     #: The increase factor to use for request timeout
     REQUEST_TIMEOUT_INCREASE_FACTOR = 1.2
 
-    def __init__(self, *, url: str,
-                 incoming_queue: "asyncio.Queue[JsonObject]",
-                 http_session: aiohttp.ClientSession,
-                 client_id: Optional[str] = None,
-                 reconnection_timeout: Union[int, float] = 1,
-                 ssl: Optional[SSLValidationMode] = None,
-                 extensions: Optional[List[Extension]] = None,
-                 auth: Optional[AuthExtension] = None,
-                 json_dumps: JsonDumper = json.dumps,
-                 json_loads: JsonLoader = json.loads,
-                 reconnect_advice: Optional[JsonObject] = None,
-                 loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
+    def __init__(
+        self,
+        *,
+        url: str,
+        incoming_queue: "asyncio.Queue[JsonObject]",
+        http_session: aiohttp.ClientSession,
+        client_id: Optional[str] = None,
+        reconnection_timeout: Union[int, float] = 1,
+        ssl: Optional[SSLValidationMode] = None,
+        extensions: Optional[List[Extension]] = None,
+        auth: Optional[AuthExtension] = None,
+        json_dumps: JsonDumper = json.dumps,
+        json_loads: JsonLoader = json.loads,
+        reconnect_advice: Optional[JsonObject] = None,
+        loop: Optional[asyncio.AbstractEventLoop] = None
+    ) -> None:
         """
         :param url: CometD service url
         :param incoming_queue: Queue for consuming incoming event
@@ -171,8 +195,9 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
             return timeout
         return None
 
-    def _set_state_event(self, old_state: TransportState,
-                         new_state: TransportState) -> None:
+    def _set_state_event(
+        self, old_state: TransportState, new_state: TransportState
+    ) -> None:
         """Set event associated with the *new_state* and clear the event for
         the *old_state*
 
@@ -190,8 +215,7 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         """
         await self._state_events[state].wait()
 
-    async def handshake(self, connection_types: List[ConnectionType]) \
-            -> JsonObject:
+    async def handshake(self, connection_types: List[ConnectionType]) -> JsonObject:
         """Executes the handshake operation
 
         :param connection_types: list of connection types
@@ -210,8 +234,7 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
 
         # send message and await its response
         response_message = await self._send_message(
-            HANDSHAKE_MESSAGE.copy(),
-            supportedConnectionTypes=connection_type_values
+            HANDSHAKE_MESSAGE.copy(), supportedConnectionTypes=connection_type_values
         )
         # store the returned client id or set it to None if it's not in the
         # response
@@ -236,8 +259,7 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         if "connectionType" in message:
             message["connectionType"] = self.connection_type.value
 
-    def _finalize_payload(self, payload: Union[JsonObject, Payload]) \
-            -> None:
+    def _finalize_payload(self, payload: Union[JsonObject, Payload]) -> None:
         """Update the ``id``, ``clientId`` and ``connectionType`` message
         fields in the *payload*, as a side effect if they're are present in
         the *message*. The *payload* can be either a single message or a list
@@ -251,8 +273,7 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         else:
             self._finalize_message(payload)
 
-    async def _send_message(self, message: JsonObject, **kwargs: Any) \
-            -> JsonObject:
+    async def _send_message(self, message: JsonObject, **kwargs: Any) -> JsonObject:
         """Send message to server
 
         :param message: A message
@@ -264,8 +285,7 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         message.update(kwargs)
         return await self._send_payload_with_auth([message])
 
-    async def _send_payload_with_auth(self, payload: Payload) \
-            -> JsonObject:
+    async def _send_payload_with_auth(self, payload: Payload) -> JsonObject:
         """Finalize and send *payload* to server and retry on authentication
         failure
 
@@ -306,8 +326,9 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         # send the payload to the server
         return await self._send_final_payload(payload, headers=headers)
 
-    async def _process_outgoing_payload(self, payload: Payload,
-                                        headers: Headers) -> None:
+    async def _process_outgoing_payload(
+        self, payload: Payload, headers: Headers
+    ) -> None:
         """Process the outgoing *payload* and *headers* with the extensions
 
         :param payload: A list of messages
@@ -319,8 +340,9 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
             await self._auth.outgoing(payload, headers)
 
     @abstractmethod
-    async def _send_final_payload(self, payload: Payload, *,
-                                  headers: Headers) -> JsonObject:
+    async def _send_final_payload(
+        self, payload: Payload, *, headers: Headers
+    ) -> JsonObject:
         """Send *payload* to server
 
         Send the *payload* to the server and return once a
@@ -349,30 +371,35 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
     def _update_subscriptions(self, response_message: JsonObject) -> None:
         """Update the set of subscriptions based on the *response_message*
 
-       :param response_message: A response message
+        :param response_message: A response message
         """
         # if a subscription response is successful, then add the channel
         # to the set of subscriptions, if it fails, then remove it
         if response_message["channel"] == MetaChannel.SUBSCRIBE:
-            if (response_message["successful"] and
-                    response_message["subscription"]
-                    not in self._subscriptions):
+            if (
+                response_message["successful"]
+                and response_message["subscription"] not in self._subscriptions
+            ):
                 self._subscriptions.add(response_message["subscription"])
-            elif (not response_message["successful"] and
-                  "subscription" in response_message and
-                  response_message["subscription"] in self._subscriptions):
+            elif (
+                not response_message["successful"]
+                and "subscription" in response_message
+                and response_message["subscription"] in self._subscriptions
+            ):
                 self._subscriptions.remove(response_message["subscription"])
 
         # if an unsubscribe response is successful then remove the channel
         # from the set of subscriptions
         if response_message["channel"] == MetaChannel.UNSUBSCRIBE:
-            if (response_message["successful"] and
-                    response_message["subscription"] in self._subscriptions):
+            if (
+                response_message["successful"]
+                and response_message["subscription"] in self._subscriptions
+            ):
                 self._subscriptions.remove(response_message["subscription"])
 
-    async def _process_incoming_payload(self, payload: Payload,
-                                        headers: Optional[Headers] = None) \
-            -> None:
+    async def _process_incoming_payload(
+        self, payload: Payload, headers: Optional[Headers] = None
+    ) -> None:
         """Process incoming *payload* and *headers* with the extensions
 
         :param payload: A list of response messages
@@ -384,10 +411,12 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
             await extension.incoming(payload, headers)
 
     async def _consume_payload(
-            self, payload: Payload, *,
-            headers: Optional[Headers] = None,
-            find_response_for: Optional[JsonObject] = None) \
-            -> Optional[JsonObject]:
+        self,
+        payload: Payload,
+        *,
+        headers: Optional[Headers] = None,
+        find_response_for: Optional[JsonObject] = None
+    ) -> Optional[JsonObject]:
         """Enqueue event messages for the consumers and update the internal
         state of the transport, based on response messages in the *payload*.
 
@@ -414,16 +443,14 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
 
             # set the message as the result and continue if it is a matching
             # response
-            if (result is None and
-                    is_matching_response(message, find_response_for)):
+            if result is None and is_matching_response(message, find_response_for):
                 result = message
                 continue
 
             await self._consume_message(message)
         return result
 
-    def _start_connect_task(self, coro: Awaitable[JsonObject]) \
-            -> Awaitable[JsonObject]:
+    def _start_connect_task(self, coro: Awaitable[JsonObject]) -> Awaitable[JsonObject]:
         """Wrap the *coro* in a future and schedule it
 
         The future is stored internally in :obj:`_connect_task`. The future's
@@ -443,7 +470,7 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         """
         if self._connect_task and not self._connect_task.done():
             self._connect_task.cancel()
-            await asyncio.wait([self._connect_task])
+            await asyncio.gather(self._connect_task, return_exceptions=True)
 
     async def connect(self) -> JsonObject:
         """Connect to the server
@@ -461,11 +488,15 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         if not self.client_id:
             raise TransportInvalidOperation(
                 "Can't connect to the server without a client id. "
-                "Do a handshake first.")
-        if self.state not in [TransportState.DISCONNECTED,
-                              TransportState.SERVER_DISCONNECTED]:
+                "Do a handshake first."
+            )
+        if self.state not in [
+            TransportState.DISCONNECTED,
+            TransportState.SERVER_DISCONNECTED,
+        ]:
             raise TransportInvalidOperation(
-                "Can't connect to a server without disconnecting first.")
+                "Can't connect to a server without disconnecting first."
+            )
 
         self._state = TransportState.CONNECTING
         return await self._start_connect_task(self._connect())
@@ -504,10 +535,12 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
             # on a failed connect or handshake operation use the reconnect
             # advice returned by the server if it's present int the response
             # message
-            if (isinstance(result, dict) and
-                    not result.get("successful", True) and
-                    "advice" in result and
-                    "reconnect" in result["advice"]):
+            if (
+                isinstance(result, dict)
+                and not result.get("successful", True)
+                and "advice" in result
+                and "reconnect" in result["advice"]
+            ):
                 reconnect_advice = result["advice"]["reconnect"]
             self._state = TransportState.CONNECTED
         except Exception as error:  # pylint: disable=broad-except
@@ -521,8 +554,9 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         if self.state != TransportState.DISCONNECTING:
             self._follow_advice(reconnect_advice, reconnect_timeout)
 
-    def _follow_advice(self, reconnect_advice: str,
-                       reconnect_timeout: Union[int, float, None]) -> None:
+    def _follow_advice(
+        self, reconnect_advice: str, reconnect_timeout: Union[int, float, None]
+    ) -> None:
         """Follow the server's reconnect advice
 
         Either a :obj:`_connect` or :obj:`handshake` operation is started
@@ -536,23 +570,24 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         """
         # do a handshake operation if advised
         if reconnect_advice == "handshake":
-            handshake_coro = defer(self.handshake,
-                                   delay=reconnect_timeout,
-                                   loop=self._loop)
+            handshake_coro = defer(
+                self.handshake, delay=reconnect_timeout, loop=self._loop
+            )
             self._start_connect_task(handshake_coro([self.connection_type]))
 
         # do a connect operation if advised
         elif reconnect_advice == "retry":
-            connect_coro = defer(self._connect,
-                                 delay=reconnect_timeout,
-                                 loop=self._loop)
+            connect_coro = defer(
+                self._connect, delay=reconnect_timeout, loop=self._loop
+            )
             self._start_connect_task(connect_coro())
 
         # there is not reconnect advice from the server or its value
         # is none
         else:
-            LOGGER.warning("No reconnect advice provided, no more operations "
-                           "will be scheduled.")
+            LOGGER.warning(
+                "No reconnect advice provided, no more operations " "will be scheduled."
+            )
             self._state = TransportState.SERVER_DISCONNECTED
 
     async def disconnect(self) -> None:
@@ -586,12 +621,11 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         :obj:`state`
         :raises TransportError: When the network request fails.
         """
-        if self.state not in [TransportState.CONNECTING,
-                              TransportState.CONNECTED]:
+        if self.state not in [TransportState.CONNECTING, TransportState.CONNECTED]:
             raise TransportInvalidOperation(
-                "Can't subscribe without being connected to a server.")
-        return await self._send_message(SUBSCRIBE_MESSAGE.copy(),
-                                        subscription=channel)
+                "Can't subscribe without being connected to a server."
+            )
+        return await self._send_message(SUBSCRIBE_MESSAGE.copy(), subscription=channel)
 
     async def unsubscribe(self, channel: str) -> JsonObject:
         """Unsubscribe from *channel*
@@ -603,12 +637,13 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         :obj:`state`
         :raises TransportError: When the network request fails.
         """
-        if self.state not in [TransportState.CONNECTING,
-                              TransportState.CONNECTED]:
+        if self.state not in [TransportState.CONNECTING, TransportState.CONNECTED]:
             raise TransportInvalidOperation(
-                "Can't unsubscribe without being connected to a server.")
-        return await self._send_message(UNSUBSCRIBE_MESSAGE.copy(),
-                                        subscription=channel)
+                "Can't unsubscribe without being connected to a server."
+            )
+        return await self._send_message(
+            UNSUBSCRIBE_MESSAGE.copy(), subscription=channel
+        )
 
     async def publish(self, channel: str, data: JsonObject) -> JsonObject:
         """Publish *data* to the given *channel*
@@ -621,10 +656,10 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         :obj:`state`
         :raises TransportError: When the network request fails.
         """
-        if self.state not in [TransportState.CONNECTING,
-                              TransportState.CONNECTED]:
+        if self.state not in [TransportState.CONNECTING, TransportState.CONNECTED]:
             raise TransportInvalidOperation(
-                "Can't publish without being connected to a server.")
-        return await self._send_message(PUBLISH_MESSAGE.copy(),
-                                        channel=channel,
-                                        data=data)
+                "Can't publish without being connected to a server."
+            )
+        return await self._send_message(
+            PUBLISH_MESSAGE.copy(), channel=channel, data=data
+        )
