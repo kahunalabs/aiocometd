@@ -575,10 +575,8 @@ class Client:  # pylint: disable=too-many-instance-attributes
             while True:
                 await self._transport.wait_for_state(TransportState.CONNECTING)
                 try:
-                    await asyncio.wait_for(
-                        self._transport.wait_for_state(TransportState.CONNECTED),
-                        timeout,
-                    )
+                    async with asyncio.timeout(timeout):
+                        await self._transport.wait_for_state(TransportState.CONNECTED)
                 except asyncio.TimeoutError:
                     break
         except asyncio.CancelledError:
