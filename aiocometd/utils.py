@@ -1,4 +1,5 @@
 """Utility functions"""
+
 import re
 import asyncio
 from functools import wraps
@@ -9,21 +10,27 @@ from aiocometd.constants import META_CHANNEL_PREFIX, SERVICE_CHANNEL_PREFIX
 from aiocometd.typing import CoroFunction, JsonObject
 
 
-def defer(coro_func: CoroFunction, delay: Union[int, float, None] = None, *,
-          loop: Optional[asyncio.AbstractEventLoop] = None) -> CoroFunction:
+def defer(
+    coro_func: CoroFunction,
+    delay: Union[int, float, None] = None,
+    *,
+    loop: Optional[asyncio.AbstractEventLoop] = None
+) -> CoroFunction:
     """Returns a coroutine function that will defer the call to the given
     *coro_func* by *delay* seconds
 
     :param coro_func: A coroutine function
     :param delay: Delay in seconds
-    :param loop: An event loop
+    :param loop: An event loop (deprecated, kept for backward compatibility)
     :return: Coroutine function wrapper
     """
+
     @wraps(coro_func)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:  \
-            # pylint: disable=missing-docstring
+    async def wrapper(
+        *args: Any, **kwargs: Any
+    ) -> Any:  # pylint: disable=missing-docstring
         if delay:
-            await asyncio.sleep(delay, loop=loop)  # type: ignore
+            await asyncio.sleep(delay)
         return await coro_func(*args, **kwargs)
 
     return wrapper
@@ -90,8 +97,9 @@ def get_error_args(error_field: Union[str, None]) -> Optional[List[str]]:
     return result
 
 
-def is_matching_response(response_message: JsonObject,
-                         message: Optional[JsonObject]) -> bool:
+def is_matching_response(
+    response_message: JsonObject, message: Optional[JsonObject]
+) -> bool:
     """Check whether the *response_message* is a response for the
     given *message*.
 
@@ -106,9 +114,11 @@ def is_matching_response(response_message: JsonObject,
     # their channel should match, if they contain an id field it should
     # also match (according to the specs an id is always optional),
     # and the response message should contain the successful field
-    return (message["channel"] == response_message["channel"] and
-            message.get("id") == response_message.get("id") and
-            "successful" in response_message)
+    return (
+        message["channel"] == response_message["channel"]
+        and message.get("id") == response_message.get("id")
+        and "successful" in response_message
+    )
 
 
 def is_server_error_message(response_message: JsonObject) -> bool:
@@ -133,10 +143,14 @@ def is_event_message(response_message: JsonObject) -> bool:
     # and if it's either not on a service channel, or it's on a service channel
     # but doesn't has an id (which means that it's not a response for an
     # outgoing message) and it has a data field
-    return (not channel.startswith(META_CHANNEL_PREFIX) and
-            (not channel.startswith(SERVICE_CHANNEL_PREFIX) or
-             "id" not in response_message) and
-            "data" in response_message)
+    return (
+        not channel.startswith(META_CHANNEL_PREFIX)
+        and (
+            not channel.startswith(SERVICE_CHANNEL_PREFIX)
+            or "id" not in response_message
+        )
+        and "data" in response_message
+    )
 
 
 def is_auth_error_message(response_message: JsonObject) -> bool:

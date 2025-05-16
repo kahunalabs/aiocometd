@@ -570,16 +570,12 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         """
         # do a handshake operation if advised
         if reconnect_advice == "handshake":
-            handshake_coro = defer(
-                self.handshake, delay=reconnect_timeout, loop=self._loop
-            )
+            handshake_coro = defer(self.handshake, delay=reconnect_timeout)
             self._start_connect_task(handshake_coro([self.connection_type]))
 
         # do a connect operation if advised
         elif reconnect_advice == "retry":
-            connect_coro = defer(
-                self._connect, delay=reconnect_timeout, loop=self._loop
-            )
+            connect_coro = defer(self._connect, delay=reconnect_timeout)
             self._start_connect_task(connect_coro())
 
         # there is not reconnect advice from the server or its value
