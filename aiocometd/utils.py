@@ -11,17 +11,13 @@ from aiocometd.typing import CoroFunction, JsonObject
 
 
 def defer(
-    coro_func: CoroFunction,
-    delay: Union[int, float, None] = None,
-    *,
-    loop: Optional[asyncio.AbstractEventLoop] = None
+    coro_func: CoroFunction, delay: Union[int, float, None] = None
 ) -> CoroFunction:
     """Returns a coroutine function that will defer the call to the given
     *coro_func* by *delay* seconds
 
     :param coro_func: A coroutine function
     :param delay: Delay in seconds
-    :param loop: An event loop (deprecated, kept for backward compatibility)
     :return: Coroutine function wrapper
     """
 

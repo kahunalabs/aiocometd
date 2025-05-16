@@ -67,8 +67,7 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         auth: Optional[AuthExtension] = None,
         json_dumps: JsonDumper = json.dumps,
         json_loads: JsonLoader = json.loads,
-        reconnect_advice: Optional[JsonObject] = None,
-        loop: Optional[asyncio.AbstractEventLoop] = None
+        reconnect_advice: Optional[JsonObject] = None
     ) -> None:
         """
         :param url: CometD service url
@@ -92,10 +91,6 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         :func:`json.loads`
         :param reconnect_advice: Initial reconnect advice
         :param http_session: HTTP client session
-        :param loop: Event :obj:`loop <asyncio.BaseEventLoop>` used to
-                     schedule tasks. If *loop* is ``None`` then
-                     :func:`asyncio.get_event_loop` is used to get the default
-                     event loop.
         """
         #: queue for consuming incoming event messages
         self.incoming_queue = incoming_queue
@@ -103,8 +98,6 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         self._url = url
         #: http session
         self._http_session = http_session
-        #: event loop used to schedule tasks
-        self._loop = loop or asyncio.get_event_loop()
         #: clinet id value assigned by the server
         self._client_id = client_id
         #: message id which should be unique for every message during a client
@@ -459,7 +452,7 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
         :param coro: Coroutine
         :return: Future
         """
-        self._connect_task = asyncio.ensure_future(coro, loop=self._loop)
+        self._connect_task = asyncio.create_task(coro)
         self._connect_task.add_done_callback(self._connect_done)
         return self._connect_task
 

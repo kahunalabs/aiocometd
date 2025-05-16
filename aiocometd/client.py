@@ -67,8 +67,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
         extensions: Optional[List[Extension]] = None,
         auth: Optional[AuthExtension] = None,
         json_dumps: JsonDumper = json.dumps,
-        json_loads: JsonLoader = json.loads,
-        loop: Optional[asyncio.AbstractEventLoop] = None
+        json_loads: JsonLoader = json.loads
     ) -> None:
         """
         :param url: CometD service url
@@ -97,10 +96,6 @@ class Client:  # pylint: disable=too-many-instance-attributes
         :func:`json.dumps`
         :param json_loads: Function for JSON deserialization, the default is \
         :func:`json.loads`
-        :param loop: Event :obj:`loop <asyncio.BaseEventLoop>` used to
-                     schedule tasks. If *loop* is ``None`` then
-                     :func:`asyncio.get_event_loop` is used to get the default
-                     event loop.
         """
         #: CometD service url
         self.url = url
@@ -111,7 +106,6 @@ class Client:  # pylint: disable=too-many-instance-attributes
             self._connection_types = list(connection_types)
         else:
             self._connection_types = self._DEFAULT_CONNECTION_TYPES
-        self._loop = loop or asyncio.get_event_loop()
         #: queue for consuming incoming event messages
         self._incoming_queue: "Optional[asyncio.Queue[JsonObject]]" = None
         #: transport object
@@ -141,7 +135,7 @@ class Client:  # pylint: disable=too-many-instance-attributes
         cls_name = type(self).__name__
         fmt_spec = (
             "{}({}, {}, connection_timeout={}, ssl={}, "
-            "max_pending_count={}, extensions={}, auth={}, loop={})"
+            "max_pending_count={}, extensions={}, auth={})"
         )
         return fmt_spec.format(
             cls_name,
@@ -152,7 +146,6 @@ class Client:  # pylint: disable=too-many-instance-attributes
             reprlib.repr(self._max_pending_count),
             reprlib.repr(self.extensions),
             reprlib.repr(self.auth),
-            reprlib.repr(self._loop),
         )
 
     @property
@@ -258,7 +251,6 @@ class Client:  # pylint: disable=too-many-instance-attributes
             json_dumps=self._json_dumps,
             json_loads=self._json_loads,
             http_session=http_session,
-            loop=self._loop,
         )
 
         try:
@@ -299,7 +291,6 @@ class Client:  # pylint: disable=too-many-instance-attributes
                     json_loads=self._json_loads,
                     reconnect_advice=advice,
                     http_session=http_session,
-                    loop=self._loop,
                 )
             return transport
         except Exception:
