@@ -536,6 +536,11 @@ class TransportBase(Transport):  # pylint: disable=too-many-instance-attributes
             ):
                 reconnect_advice = result["advice"]["reconnect"]
             self._state = TransportState.CONNECTED
+        except asyncio.CancelledError:
+            # If the task was cancelled, don't try to reconnect
+            if self.state != TransportState.DISCONNECTING:
+                self._state = TransportState.DISCONNECTED
+            return
         except Exception as error:  # pylint: disable=broad-except
             result = error
             reconnect_timeout = self._reconnect_timeout

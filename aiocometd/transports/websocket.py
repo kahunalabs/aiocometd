@@ -218,7 +218,7 @@ class WebSocketTransport(TransportBase):
         """
         # if the receive task is not running then start it
         if self._receive_task is None:
-            self._receive_task = self._loop.create_task(self._receive(socket))
+            self._receive_task = asyncio.create_task(self._receive(socket))
             self._receive_task.add_done_callback(self._receive_done)
 
     async def _receive(self, socket: WebSocket) -> None:
